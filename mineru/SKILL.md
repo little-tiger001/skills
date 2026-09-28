@@ -1,6 +1,6 @@
 ---
 name: mineru
-description: "Parse and read documents (PDF, images, Word, PPT, Excel) with the official MinerU API. Use when the user asks to 解析/提取/转换/阅读 a document or PDF, extract text/tables/formulas/images, or mentions MinerU. Check ./.mineru/ for an existing Markdown result before parsing; outputs use ./.mineru/ with images in ./.mineru/img/."
+description: "Parse and read documents (PDF, images, Word, PPT, Excel) with the official MinerU API. Use when the user asks to 解析/提取/转换/阅读 a document or PDF, extract text/tables/formulas/images, or mentions MinerU. Also use to 整理/清理/维护 the .mineru cache folder — find and delete 死文件/orphaned/stale Markdown and images whose source document was renamed or deleted (清理 .mineru 文件夹, 清理死文件, 清理缓存). Check ./.mineru/ for an existing Markdown result before parsing; outputs use ./.mineru/ with images in ./.mineru/img/."
 argument-hint: "[要解析的文件路径，可多个]"
 user-invocable: true
 ---
@@ -13,6 +13,7 @@ user-invocable: true
 - 用户要求「解析 / 提取 / 转换」某个文档或 PDF 为 Markdown
 - 用户要求「阅读」某个 PDF，或要求根据 PDF 内容回答问题
 - 用户要求从文档中提取文字、表格、公式、图片
+- 用户要求「整理 / 清理」`.mineru/` 缓存，或删除源文件改名后残留的死文件
 - 用户提到 MinerU
 
 ## 配置
@@ -28,6 +29,20 @@ Token 等配置存放在本 skill 目录下的 `.env` 文件。首次使用时�
    ```
 5. 脚本会将 Markdown 写入 `.mineru/`，将提取的图片写入 `.mineru/img/`。
 6. 向用户报告命中的 Markdown，或新生成的 Markdown 和图片数量。
+
+## 清理死文件
+源文件被改名或删除后，`.mineru/` 中对应的 Markdown 与图片会失去指向，成为死文件。
+用清理脚本扫描并删除它们（脚本按命名规则反查源文件是否存在）：
+
+```
+python <SKILL_DIR>\\scripts\\clean.py            # 预览（dry-run，默认）
+python <SKILL_DIR>\\scripts\\clean.py --delete   # 删除（会二次确认）
+python <SKILL_DIR>\\scripts\\clean.py --delete --yes   # 跳过确认
+```
+
+- 默认只列出死文件，不删除；加 `--delete` 才真正删除。
+- 会同时清理死 Markdown 和 `.mineru/img/` 中对应的孤儿图片，并删除空的 `img/` 目录。
+- 若源文件只是改名，可先用 `--delete` 清掉旧缓存，再重新解析新文件。
 
 ## 注意事项
 - 单文件限制：不超过 200MB、200 页。
