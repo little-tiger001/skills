@@ -23,6 +23,22 @@ import argparse
 import sys
 from pathlib import Path
 
+
+def configure_console() -> None:
+    """保证输出在管道/重定向/GBK 控制台下也不会因特殊字符崩溃。
+
+    见 parse.py 中同名函数：输出被捕获时 Windows Python 会回退到本地编码
+    （GBK），U+2713 等符号会触发 UnicodeEncodeError。统一改为 UTF-8 并兜底。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
+configure_console()
+
 # 会被解析的源文件后缀（与 MinerU 支持格式一致）
 SOURCE_EXTS = {
     ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
@@ -119,7 +135,7 @@ def main():
     total_size = sum(p.stat().st_size for p in orphan_mds + orphan_imgs)
 
     if not orphan_mds and not orphan_imgs:
-        print("✓ 没有死文件，缓存干净。")
+        print("[OK] 没有死文件，缓存干净。")
         return
 
     print(f"\n发现死文件: {len(orphan_mds)} 个 Markdown, "
@@ -151,7 +167,7 @@ def main():
             p.unlink()
             removed += 1
         except OSError as e:
-            print(f"  ✗ 删除失败 {p.name}: {e}")
+            print(f"  [FAIL] 删除失败 {p.name}: {e}")
 
     # 清理空的 img 目录
     img_dir = out_dir / "img"
@@ -163,7 +179,7 @@ def main():
             pass
 
     print("=" * 60)
-    print(f"✓ 已删除 {removed} 个死文件，释放 {human_size(total_size)}")
+    print(f"[OK] 已删除 {removed} 个死文件，释放 {human_size(total_size)}")
 
 
 if __name__ == "__main__":

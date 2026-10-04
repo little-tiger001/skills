@@ -34,6 +34,24 @@ API_BASE = "https://mineru.net/api/v4"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 
 
+def configure_console() -> None:
+    """保证输出在管道/重定向/GBK 控制台下也不会因特殊字符崩溃。
+
+    Windows 上 Python 只有连接真实控制台时才用 UTF-8；当输出被管道或重定向
+    捕获（如被 Agent、IDE、CI 调用）时会回退到本地编码（简体中文为 GBK），
+    此时写入 U+25B6 等不在 GBK 中的符号会抛 UnicodeEncodeError。这里统一改为
+    UTF-8，并用 errors="replace" 兜底，任何编码环境都不会再中断解析流程。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
+configure_console()
+
+
 # --------------------------------------------------------------------------- #
 # 配置
 # --------------------------------------------------------------------------- #
@@ -298,16 +316,16 @@ def main():
         if not file_path.exists():
             print(f"\n[跳过] 文件不存在: {file_path}")
             continue
-        print(f"\n▶ 解析: {file_path.name}")
+        print(f"\n>> 解析: {file_path.name}")
         try:
             md_path, img_count = process_file(
                 file_path, out_dir, img_dir, Path.cwd(), token, model, language,
                 is_ocr, enable_table, enable_formula, args.timeout)
             rel_md = f".mineru/{md_path.name}"
             ok_count += 1
-            print(f"  ✓ 完成: {rel_md} (图片 {img_count} 张)")
+            print(f"  [OK] 完成: {rel_md} (图片 {img_count} 张)")
         except Exception as e:
-            print(f"  ✗ 失败: {e}")
+            print(f"  [FAIL] 失败: {e}")
 
     print("=" * 60)
     print(f"全部完成: 成功 {ok_count}/{len(args.files)} 个文件")
