@@ -6,3 +6,11 @@ __pycache__/
 .mineru/
 tavily-search-pro__skillhub/lib/keys.txt
 tavily-search-pro__skillhub/lib/.key_cursor
+
+# DSH 运行时状态：机器本地，会随装/更新技能变化，不属于技能内容
+.skills_store_lock.json
+.model_invocation_to_override_migration.json
+.disable_to_model_invocation_migration.json
+
+# 带日期戳的备份副本
+*.bak-*
