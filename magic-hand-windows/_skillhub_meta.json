@@ -1,0 +1,11 @@
+{
+  "name": "妙控手 MagicHand · Windows 桌面操控",
+  "installedAt": 1791819239119,
+  "source": "marketplace",
+  "version": "1.1.0",
+  "skillId": "skill_2103878054803845120",
+  "pay_mode": 0,
+  "description_zh": "Windows 桌面操控（Computer Use）：让 AI 亲手操作本机应用。原生 Win32 界面走 HWND 树按索引精准点击；自绘界面（微信、Qt、Flutter、Electron）自动回退到截图判态 + 坐标点击。纯 ctypes 实现，零第三方依赖，离线可用，每一步回读验证。",
+  "description_en": "Windows computer use — let the agent drive desktop apps directly. Indexed clicks via the Win32 HWND tree for native UIs; screenshot + coordinate fallback for self-drawn UIs (WeChat, Qt, Flutter, Electron). Pure ctypes, zero dependencies, works offline, with read-back verification on every step.",
+  "iconSource": "letter:auto"
+}
