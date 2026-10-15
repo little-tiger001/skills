@@ -4,3 +4,5 @@ __pycache__/
 **/__pycache__/
 *.pyc
 .mineru/
+tavily-search-pro__skillhub/lib/keys.txt
+tavily-search-pro__skillhub/lib/.key_cursor

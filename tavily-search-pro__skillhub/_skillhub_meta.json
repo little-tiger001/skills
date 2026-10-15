@@ -1,0 +1,15 @@
+{
+  "slug": "tavily-search-pro",
+  "name": "Tavily Search Pro",
+  "version": "1.0.0",
+  "installedAt": 1791809574310,
+  "source": "skillhub",
+  "namespace": "clawhub_shaharsha",
+  "canonicalName": "@clawhub_shaharsha/tavily-search-pro",
+  "iconSource": "https://cloudcache.tencent-cloud.com/qcloud/ui/static/other_external_resource/401a454b-4b16-4aee-a18c-4e3467ca48f1.png",
+  "labels": {
+    "requires_api_key": "true"
+  },
+  "iconLocalPath": "C:\\Users\\zhang\\.workbuddy\\skills\\tavily-search-pro__skillhub\\_icon.png",
+  "iconDownloadedFrom": "https://cloudcache.tencent-cloud.com/qcloud/ui/static/other_external_resource/401a454b-4b16-4aee-a18c-4e3467ca48f1.png"
+}
