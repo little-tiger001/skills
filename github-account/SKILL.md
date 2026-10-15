@@ -106,7 +106,7 @@ node scripts/gitlab.mjs release <id|group/project> --tag 1.1.0 --ref main \
 - **API 只能建「HTTPS + 密码」镜像**：`POST /projects/:id/remote_mirrors` 带 `{url, enabled, auth_method:'password', user, password}`（实测 201）。`auth_method:'ssh'` 在 POST 与 PUT 上都被拒（`auth_method 不包含于列表中`），**SSH 镜像只能在网页上建**。
 - 网页建 SSH 推送镜像的要点：URL `ssh://git@github.com/<owner>/<repo>.git`、方向=推送、验证方式=SSH 公钥、用户名=`git`；先点**「检测主机密钥」**（`GET /remote_mirrors` 里 `host_keys` 有值才算成功，实测拿到 GitHub 三把主机密钥）；「保留分叉的 refs」不勾 = 源端强制覆盖目标端，「仅镜像受保护的分支」不勾才连 tag 一起同步。
 - 建完把页面上生成的公钥挂到目标仓库当**可写** deploy key：`node scripts/github.mjs add-deploy-key <owner/repo> --file pub --title "GitLab push mirror"`（`read_only` 必须为 false，否则推送被拒）。
-- **`PUT /projects/:id/remote_mirrors/:id` 不触发更新**（实测返回 200 后 `update_status` 仍是 `none`）。真正的触发是**向源仓库 push 一次**，且有 5 分钟左右节流。实测推一个临时 tag 后：`none → started → finished`（约 10 秒），`last_successful_update_at` 有时间戳、`last_error` 为空。
+- **`PUT /projects/:id/remote_mirrors/:id` 不触发更新**（实测返回 200 后 `update_status` 仍是 `none`）。真正的触发是**向源仓库 push 一次**，而且是**节流**的：实测推 tag 后约 10–25 秒完成，但实测一次正常提交的端到端延迟是 **约 3 分 11 秒**（提交 21:44:16 → 镜像成功 21:47:27），符合文档里「最多每 5 分钟更新一次」。**看到目标仓库没立刻变不要以为坏了**，等几分钟再查 `mirrors`：`状态=finished` 且 `上次成功` 有时间戳、`last_error` 为空，再去目标端 `ls-remote` 核对 ref。
 - **验证不能只看状态**：一定要去目标端 `git ls-remote` 核对那个 ref 真的到了（实测 tag 出现在 GitHub 上）。
 - **推送镜像不会删除 ref**：源端删掉的分支/tag，目标端会留着，必须两边各删一次。`keep_divergent_refs:false` 下源端会强推覆盖目标端，所以**启用镜像后不要再直接往目标仓库推**。
 - API 读不到镜像的 SSH 公钥（响应里没有 `public_key` 字段），只能从网页复制。
