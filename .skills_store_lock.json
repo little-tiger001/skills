@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "@user_b95ee7e5/best-price-new": {
+      "name": "购物比价助手",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=best-price-new&namespace=user_b95ee7e5",
+      "source": "community",
+      "version": "1.2.1",
+      "namespace": {
+        "canonicalName": "@user_b95ee7e5/best-price-new",
+        "displayName": "user_b95ee7e5",
+        "handle": "user_b95ee7e5",
+        "publicSlug": "best-price-new"
+      },
+      "internalSlug": "best-price-new",
+      "publicSlug": "best-price-new",
+      "installDir": "C:\\Users\\zhang\\.agents\\skills\\@user_b95ee7e5\\best-price-new"
+    }
+  }
+}
