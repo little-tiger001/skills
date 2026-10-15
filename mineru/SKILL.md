@@ -22,13 +22,20 @@ Token 等配置存放在本 skill 目录下的 `.env` 文件。首次使用时�
 ## 使用步骤
 1. 确认文件路径和当前工作区根目录。
 2. 阅读 PDF 时先按命名规则检查缓存：把 PDF 相对工作区根目录路径中的 `/` 转换为 `-`，去掉 PDF 后缀。例如 `课件/课件-0-绪论.pdf` 对应 `.mineru/课件-课件-0-绪论.md`。
-3. 如果对应 Markdown 存在，直接读取它，并按需读取 `.mineru/img/` 中的图片；不要重新调用 API。
+3. 如果对应 Markdown 存在，直接读取它，并按需读取 `.mineru/img/` 中的图片；不要重新调用 API。若还需要页码、表格 HTML、公式等机器可读结构，读同名的 `.mineru/<同名>.content_list.json`。
 4. 如果 Markdown 不存在，或用户明确要求重新解析，在当前工作区根目录运行：
    ```
    python <SKILL_DIR>\\scripts\\parse.py <文件1> [文件2 ...]
    ```
-5. 脚本会将 Markdown 写入 `.mineru/`，将提取的图片写入 `.mineru/img/`。
-6. 向用户报告命中的 Markdown，或新生成的 Markdown 和图片数量。
+   常用附加参数：`--refresh`（忽略缓存强制重解析）、`--keep-zip`（把 MinerU 返回的完整 zip 保存到工作区根目录，便于查看包内内容）、`--ocr`（扫描件）、`--model pipeline|vlm`。
+5. 脚本会将 Markdown 写入 `.mineru/`，将提取的图片写入 `.mineru/img/`，将内容列表写入 `.mineru/<同名>.content_list.json`。
+6. 向用户报告命中的 Markdown，或新生成的 Markdown、图片数量与内容列表。
+
+## 输出文件与优先级
+- `.mineru/<同名>.md`：正文，阅读、检索、总结首选。
+- `.mineru/<同名>.content_list.json`：按阅读顺序的块列表，每块含 `type`（text/title/table/image/equation）、`page_idx`、`text_level`、表格 HTML、公式 LaTeX。需要页码引用、只取表格/公式、按章节切分时用它。
+- `.mineru/img/`：提取的图片，md 中的引用已改写为 `img/<名>`。
+- 包内的 `layout.json`(middle.json)、`*_model.json` 体积大且基本只服务渲染，**不落盘**；确需查看时用 `--keep-zip` 保留原始 zip 自行解压。
 
 ## 清理死文件
 源文件被改名或删除后，`.mineru/` 中对应的 Markdown 与图片会失去指向，成为死文件。
@@ -41,7 +48,7 @@ python <SKILL_DIR>\\scripts\\clean.py --delete --yes   # 跳过确认
 ```
 
 - 默认只列出死文件，不删除；加 `--delete` 才真正删除。
-- 会同时清理死 Markdown 和 `.mineru/img/` 中对应的孤儿图片，并删除空的 `img/` 目录。
+- 会同时清理死 Markdown、内容列表 JSON 和 `.mineru/img/` 中对应的孤儿图片，并删除空的 `img/` 目录。
 - 若源文件只是改名，可先用 `--delete` 清掉旧缓存，再重新解析新文件。
 
 ## 注意事项

@@ -7,13 +7,15 @@ MinerU 官方 API 文档解析脚本（仅用 Python 标准库，无需安装依
   1. POST /api/v4/file-urls/batch  申请签名上传 URL，得到 batch_id
   2. PUT  文件字节到签名 URL
   3. 轮询 GET /api/v4/extract-results/batch/{batch_id} 直到 state=done
-  4. 下载 full_zip_url（zip 包）
-  5. 解压，定位 full.md 与图片
-  6. 写入 ./.mineru/<文件名>.md，图片写入 ./.mineru/img/，并改写 md 图片路径
+  4. 下载 full_zip_url（zip 包），可选保留原始 zip
+  5. 解压，定位 full.md、content_list JSON 与图片
+  6. 写入 ./.mineru/<文件名>.md，图片写入 ./.mineru/img/，内容列表写入
+     ./.mineru/<文件名>.content_list.json，并改写 md 图片路径
 
 用法：
   python parse.py <文件1> [文件2 ...] [--ocr] [--no-table] [--no-formula]
                   [--model vlm|pipeline] [--language ch] [--timeout 600]
+                  [--keep-zip [目录]] [--refresh]
 """
 
 import argparse
@@ -225,9 +227,16 @@ def output_stem(file_path: Path, workspace_root: Path) -> str:
 def process_file(file_path: Path, out_dir: Path, img_dir: Path,
                  workspace_root: Path,
                  token: str, model: str, language: str, is_ocr: bool,
-                 enable_table: bool, enable_formula: bool, timeout: int):
-    """解析单个文件，返回 (md_path, image_count)。"""
+                 enable_table: bool, enable_formula: bool, timeout: int,
+                 keep_zip: bool = False, zip_dir: Path = None,
+                 refresh: bool = False):
+    """解析单个文件，返回 (md_path, image_count, json_names, zip_path)。"""
     stem = output_stem(file_path, workspace_root)
+    md_path = out_dir / f"{stem}.md"
+    if md_path.exists() and not refresh:
+        print(f"  已存在缓存 Markdown，跳过 API 调用: .mineru/{stem}.md")
+        return md_path, None, [], None
+
     print(f"  [1/4] 提交并上传: {file_path.name}")
     batch_id = submit_and_upload(file_path, token, model, language,
                                  is_ocr, enable_table, enable_formula)
@@ -244,8 +253,16 @@ def process_file(file_path: Path, out_dir: Path, img_dir: Path,
     if status != 200:
         raise RuntimeError(f"下载结果失败 (HTTP {status})")
 
+    zip_path = None
+    if keep_zip:
+        target_dir = zip_dir or workspace_root
+        target_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = target_dir / f"{stem}.zip"
+        zip_path.write_bytes(zip_bytes)
+
     md_content = None
     base_to_new = {}
+    json_names = []
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
         names = zf.namelist()
         # 定位 full.md
@@ -253,6 +270,22 @@ def process_file(file_path: Path, out_dir: Path, img_dir: Path,
         if not md_name:
             raise RuntimeError("结果包中未找到 full.md")
         md_content = zf.read(md_name).decode("utf-8", "replace")
+
+        # 内容列表 JSON：保留阅读顺序、页码、表格 HTML、公式等结构信息
+        for n in names:
+            base = os.path.basename(n)
+            if base.endswith("_content_list.json") or \
+                    base.endswith("_content_list_v2.json"):
+                try:
+                    data = json.loads(zf.read(n).decode("utf-8", "replace"))
+                except Exception:
+                    continue
+                # 去掉 MinerU 生成的 UUID 前缀，只保留 content_list 语义
+                name = re.sub(r"^.*?_content_list", "content_list", base)
+                (out_dir / f"{stem}.{name}").write_text(
+                    json.dumps(data, ensure_ascii=False, indent=1),
+                    encoding="utf-8")
+                json_names.append(name)
 
         # 收集图片
         for n in names:
@@ -264,11 +297,10 @@ def process_file(file_path: Path, out_dir: Path, img_dir: Path,
                 with open(img_dir / new_name, "wb") as out:
                     out.write(zf.read(n))
 
-    print(f"  [4/4] 写入 Markdown 与图片")
+    print(f"  [4/4] 写入 Markdown、内容列表与图片")
     md_content = rewrite_image_refs(md_content, base_to_new)
-    md_path = out_dir / f"{stem}.md"
     md_path.write_text(md_content, encoding="utf-8")
-    return md_path, len(base_to_new)
+    return md_path, len(base_to_new), json_names, zip_path
 
 
 # --------------------------------------------------------------------------- #
@@ -283,7 +315,15 @@ def main():
     parser.add_argument("--model", default=None, help="vlm 或 pipeline")
     parser.add_argument("--language", default=None, help="解析语言，如 ch")
     parser.add_argument("--timeout", type=int, default=600, help="轮询超时秒数")
+    parser.add_argument("--keep-zip", nargs="?", const="", default=None,
+                        metavar="DIR",
+                        help="把 MinerU 返回的完整 zip 保存到 DIR（默认工作区根目录）")
+    parser.add_argument("--refresh", action="store_true",
+                        help="忽略已有 Markdown 缓存，强制重新调用 API")
     args = parser.parse_args()
+
+    keep_zip = args.keep_zip is not None
+    zip_dir = Path(args.keep_zip).resolve() if args.keep_zip else None
 
     skill_dir = Path(__file__).resolve().parent.parent
     cfg = load_env(skill_dir / ".env")
@@ -318,12 +358,19 @@ def main():
             continue
         print(f"\n>> 解析: {file_path.name}")
         try:
-            md_path, img_count = process_file(
+            md_path, img_count, json_names, zip_path = process_file(
                 file_path, out_dir, img_dir, Path.cwd(), token, model, language,
-                is_ocr, enable_table, enable_formula, args.timeout)
+                is_ocr, enable_table, enable_formula, args.timeout,
+                keep_zip, zip_dir, args.refresh)
             rel_md = f".mineru/{md_path.name}"
             ok_count += 1
-            print(f"  [OK] 完成: {rel_md} (图片 {img_count} 张)")
+            if img_count is None:
+                print(f"  [OK] 命中缓存: {rel_md}")
+            else:
+                extra = f"，内容列表 {', '.join(json_names)}" if json_names else ""
+                print(f"  [OK] 完成: {rel_md} (图片 {img_count} 张{extra})")
+            if zip_path:
+                print(f"  [ZIP] 完整结果包: {zip_path}")
         except Exception as e:
             print(f"  [FAIL] 失败: {e}")
 

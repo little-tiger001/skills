@@ -85,6 +85,12 @@ def find_orphans(out_dir: Path, valid_stems: set):
         if md.stem not in valid_stems:
             orphan_mds.append(md)
 
+    # 内容列表：<stem>.content_list.json / <stem>.content_list_v2.json
+    for js in sorted(out_dir.glob("*.content_list*.json")):
+        stem = js.name.split(".content_list")[0]
+        if stem not in valid_stems:
+            orphan_mds.append(js)
+
     img_dir = out_dir / "img"
     if img_dir.exists():
         for img in sorted(img_dir.iterdir()):
