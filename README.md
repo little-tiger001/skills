@@ -17,6 +17,7 @@ A collection of reusable skills for AI coding agents.
 | `skillhub-preference` | Prefer `skillhub` over `clawhub` when discovering, installing or updating skills. |
 | `super-productivity-plugin-dev` | Write, review, debug or install Super Productivity plugins (`manifest.json` plus `plugin.js`/`index.html`, packaged as a ZIP). |
 | `ustc-cloud` | Work with the USTC cloud drive (pan.ustc.edu.cn, a customised Seafile) over WebDAV: list, download, upload, delete, write `seafile-ignore.txt`, and troubleshoot sync problems. |
+| `ustc-passport-login` | Log in to the USTC unified identity service (id.ustc.edu.cn, a Ruijie RG-SourceID build) over plain HTTP and get a CAS ticket plus an authenticated `requests.Session`; covers CAS-direct services, ITDR-gateway services (jw) and app-owned OIDC+PKCE entries (tokenworks). |
 
 ## Installation
 
