@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Template for the local targets.json. Copy this file to targets.json and add your own sites; targets.json is gitignored because it may contain sensitive sites. Adding a target only affects site-test; site groups and routing rules in the subscription config are separate.",
+  "description": "Template for the local targets.json. Copy this file to targets.json and add your own sites; targets.json is gitignored because it may contain sensitive sites. url may be a full URL or a bare host like google.com (normalized to https://google.com/). Adding a target only affects site-test; site groups and routing rules in the subscription config are separate.",
   "targets": [
     {
       "name": "github",

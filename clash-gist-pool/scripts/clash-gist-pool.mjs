@@ -906,6 +906,14 @@ async function runTests(out, o, pool) {
   }
 }
 
+function normalizeTargetUrl(raw) {
+  let value = String(raw || '').trim();
+  if (!value) return '';
+  if (value.startsWith('//')) value = `https:${value}`;
+  if (!/^https?:\/\//i.test(value)) value = `https://${value.replace(/^\/+/, '')}`;
+  try { return new URL(value).toString(); } catch { return ''; }
+}
+
 function loadTargets(o) {
   const explicitFile = o['targets-file'] || process.env.TARGETS_FILE;
   const localFile = path.join(SKILL_ROOT, 'targets.json');
@@ -920,10 +928,11 @@ function loadTargets(o) {
     raw = readJson(SOURCES_PATH, {}).targets || [];
   }
   const list = Array.isArray(raw) ? raw : raw.targets;
-  const all = (Array.isArray(list) ? list : []).filter(t => {
-    if (!t || !t.name || !t.url) return false;
-    try { new URL(t.url); return true; } catch { return false; }
-  });
+  const all = (Array.isArray(list) ? list : []).map(t => {
+    if (!t || !t.name || !t.url) return null;
+    const url = normalizeTargetUrl(t.url);
+    try { new URL(url); return { ...t, url }; } catch { return null; }
+  }).filter(Boolean);
   const names = o.targets ? String(o.targets).split(',').map(s => s.trim()).filter(Boolean) : null;
   return names ? all.filter(t => names.includes(t.name)) : all;
 }
