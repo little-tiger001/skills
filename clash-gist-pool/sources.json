@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "lastVerified": "2026-10-18",
+  "notes": "Active public gist sources with proxies-only all.yaml. Update cadence/status after each audit; do not put credentials or tokens here.",
+  "discovery": {
+    "queries": [
+      "all.yaml+proxies",
+      "all.yaml+hysteria2",
+      "all.yaml+vmess",
+      "base64.txt+mihomo.yaml",
+      "subs-check"
+    ],
+    "maxPages": 2,
+    "maxAgeDays": 7,
+    "minNodes": 5,
+    "minCaTls": 1,
+    "maxCandidates": 40
+  },
+  "sources": [
+    {
+      "tag": "rockdale",
+      "owner": "rockdale1899-alt",
+      "id": "822c95e7a9648a0283e7841270c75f3b",
+      "gist": "https://gist.github.com/rockdale1899-alt/822c95e7a9648a0283e7841270c75f3b",
+      "raw": "https://gist.githubusercontent.com/rockdale1899-alt/822c95e7a9648a0283e7841270c75f3b/raw/all.yaml",
+      "priority": 1,
+      "enabled": true,
+      "expectedNodes": 916,
+      "cadence": "~2h12m, very regular",
+      "lastAudit": "2026-10-18 18:14 +08",
+      "notes": "Largest active pool; mixed protocols; high skip-cert-verify ratio."
+    },
+    {
+      "tag": "tdison",
+      "owner": "Tdison",
+      "id": "6b745663fd038e3c63e0880ecc652bcf",
+      "gist": "https://gist.github.com/Tdison/6b745663fd038e3c63e0880ecc652bcf",
+      "raw": "https://gist.githubusercontent.com/Tdison/6b745663fd038e3c63e0880ecc652bcf/raw/all.yaml",
+      "priority": 2,
+      "enabled": true,
+      "expectedNodes": 51,
+      "cadence": "~35-36m, very regular",
+      "lastAudit": "2026-10-18 17:54 +08",
+      "notes": "Fastest refresher; mostly HTTP proxies; high skip-cert-verify ratio."
+    },
+    {
+      "tag": "december",
+      "owner": "December000",
+      "id": "fd23d2530ffc29264297a5e687a79ecd",
+      "gist": "https://gist.github.com/December000/fd23d2530ffc29264297a5e687a79ecd",
+      "raw": "https://gist.githubusercontent.com/December000/fd23d2530ffc29264297a5e687a79ecd/raw/all.yaml",
+      "priority": 3,
+      "enabled": true,
+      "expectedNodes": 40,
+      "cadence": "~1h, regular",
+      "lastAudit": "2026-10-18 17:52 +08",
+      "notes": "Stable hourly; Trojan/VLESS/Hysteria2 mix."
+    },
+    {
+      "tag": "scaleflower",
+      "owner": "scaleflower",
+      "id": "20a2175ba0525a3660c40b837caeb97b",
+      "gist": "https://gist.github.com/scaleflower/20a2175ba0525a3660c40b837caeb97b",
+      "raw": "https://gist.githubusercontent.com/scaleflower/20a2175ba0525a3660c40b837caeb97b/raw/all.yaml",
+      "priority": 4,
+      "enabled": true,
+      "expectedNodes": 244,
+      "cadence": "~daily around 04:00 +08, but historical 4-10 day gaps",
+      "lastAudit": "2026-10-18 04:28 +08",
+      "notes": "Large; mostly HTTP; almost all skip-cert-verify; treat as untrusted."
+    },
+    {
+      "tag": "lzj05",
+      "owner": "lzj05",
+      "id": "c7a3615e1fd9ccdd4a9a5caf853d6d54",
+      "gist": "https://gist.github.com/lzj05/c7a3615e1fd9ccdd4a9a5caf853d6d54",
+      "raw": "https://gist.githubusercontent.com/lzj05/c7a3615e1fd9ccdd4a9a5caf853d6d54/raw/all.yaml",
+      "priority": 5,
+      "enabled": true,
+      "expectedNodes": 337,
+      "cadence": "irregular: hours to days",
+      "lastAudit": "2026-10-18 11:22 +08",
+      "notes": "Large; mostly HTTP; very high skip-cert-verify ratio."
+    },
+    {
+      "tag": "haidejiang",
+      "owner": "HAIDEJIANG",
+      "id": "b68d405379a0ffd9b686c6c497b484c1",
+      "gist": "https://gist.github.com/HAIDEJIANG/b68d405379a0ffd9b686c6c497b484c1",
+      "raw": "https://gist.githubusercontent.com/HAIDEJIANG/b68d405379a0ffd9b686c6c497b484c1/raw/all.yaml",
+      "priority": 6,
+      "enabled": true,
+      "expectedNodes": 32,
+      "cadence": "irregular, roughly 1-6h",
+      "lastAudit": "2026-10-18 15:28 +08",
+      "notes": "Already present in the user's Clash Verge profiles; mixed modern protocols."
+    },
+    {
+      "tag": "mathdeep",
+      "owner": "Mathdeep258",
+      "id": "007cc1adcae763f9388259f71fea0b40",
+      "gist": "https://gist.github.com/Mathdeep258/007cc1adcae763f9388259f71fea0b40",
+      "raw": "https://gist.githubusercontent.com/Mathdeep258/007cc1adcae763f9388259f71fea0b40/raw/all.yaml",
+      "priority": 7,
+      "enabled": true,
+      "expectedNodes": 15,
+      "cadence": "irregular, multiple times/day with 2-20h gaps",
+      "lastAudit": "2026-10-18 15:19 +08",
+      "notes": "Already present in the user's Clash Verge profiles; Hysteria2/VLESS/VMess."
+    },
+    {
+      "tag": "fdzz",
+      "owner": "fdzzxzxx",
+      "id": "c6a98bad66f358daf6d9b0128c4aed74",
+      "gist": "https://gist.github.com/fdzzxzxx/c6a98bad66f358daf6d9b0128c4aed74",
+      "raw": "https://gist.githubusercontent.com/fdzzxzxx/c6a98bad66f358daf6d9b0128c4aed74/raw/all.yaml",
+      "priority": 8,
+      "enabled": true,
+      "expectedNodes": 24,
+      "cadence": "1-2x/day with short retry bursts",
+      "lastAudit": "2026-10-18 13:37 +08",
+      "notes": "Already present in the user's Clash Verge profiles; HTTP/Hysteria/VLESS/mieru mix."
+    }
+  ]
+}
