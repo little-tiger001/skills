@@ -907,8 +907,17 @@ async function runTests(out, o, pool) {
 }
 
 function loadTargets(o) {
-  const cfg = readJson(SOURCES_PATH, {});
-  const all = Array.isArray(cfg.targets) ? cfg.targets : [];
+  const file = path.resolve(o['targets-file'] || process.env.TARGETS_FILE || path.join(SKILL_ROOT, 'targets.json'));
+  let raw = readJson(file, null);
+  if (!raw) {
+    if (o['targets-file']) throw new Error(`targets file not found: ${file}`);
+    raw = readJson(SOURCES_PATH, {}).targets || [];
+  }
+  const list = Array.isArray(raw) ? raw : raw.targets;
+  const all = (Array.isArray(list) ? list : []).filter(t => {
+    if (!t || !t.name || !t.url) return false;
+    try { new URL(t.url); return true; } catch { return false; }
+  });
   const names = o.targets ? String(o.targets).split(',').map(s => s.trim()).filter(Boolean) : null;
   return names ? all.filter(t => names.includes(t.name)) : all;
 }
@@ -1186,7 +1195,8 @@ Common options:
   --concurrency N        parallel delay tests (default 16)
   --attempts N           attempts per proxy (default 1)
   --url URL              health-check URL for test/pipeline
-  --targets LIST         site-test target names (default: all in sources.json)
+  --targets LIST         site-test target names (default: all in targets.json)
+  --targets-file PATH    alternate target list (JSON {targets:[{name,url}]})
   --max-delay MS         usable threshold (default 1500)
   --limit N              test/build only first N proxies
   --force                refetch even if updated_at is unchanged

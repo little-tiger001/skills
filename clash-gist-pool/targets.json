@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "description": "Editable site-test targets. name is used by --targets; url should be a small endpoint reachable through the proxy. Adding a target here only affects site-test; site groups and routing rules in the subscription config are separate.",
+  "targets": [
+    {
+      "name": "github",
+      "url": "https://github.com/robots.txt"
+    },
+    {
+      "name": "google",
+      "url": "https://www.google.com/generate_204"
+    },
+    {
+      "name": "chatgpt",
+      "url": "https://chatgpt.com/robots.txt"
+    },
+    {
+      "name": "grok",
+      "url": "https://grok.com/robots.txt"
+    },
+    {
+      "name": "claude",
+      "url": "https://claude.ai/robots.txt"
+    },
+    {
+      "name": "youtube",
+      "url": "https://www.youtube.com/robots.txt"
+    }
+  ]
+}

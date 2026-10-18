@@ -56,7 +56,7 @@ publish              upload usable.yaml as nodes.yaml to a secret Gist
 status               show cached source state
 ```
 
-Common options: `--out DIR`, `--source TAG`, `--force`, `--limit N`, `--type http,vless`, `--exclude-insecure`, `--ca-tls`, `--timeout MS`, `--concurrency N`, `--attempts N`, `--url URL`, `--targets github,google`, `--max-delay MS`, `--core PATH`, `--allow-tun`, `--mixed-port`, `--api-port`.
+Common options: `--out DIR`, `--source TAG`, `--force`, `--limit N`, `--type http,vless`, `--exclude-insecure`, `--ca-tls`, `--timeout MS`, `--concurrency N`, `--attempts N`, `--url URL`, `--targets github,google`, `--targets-file PATH`, `--max-delay MS`, `--core PATH`, `--allow-tun`, `--mixed-port`, `--api-port`.
 
 Discovery/pipeline options: `--add`, `--discover`, `--publish`, `--query "all.yaml+proxies,..."`, `--max-pages N`, `--max-candidates N`, `--max-age-days N`, `--min-nodes N`, `--min-ca-tls N`, `--no-test`, `--gist ID` (or `GIST_ID` env). `pipeline` uses the same filter flags as `sync`/`build`; use `--exclude-insecure --ca-tls` for the current 11-node subscription. `--add` only appends discovered sources with `enabled: false`; review `discovered.md` before enabling.
 
@@ -109,7 +109,9 @@ node $skill site-test --out .\gist-pool
 node $skill site-test --out .\gist-pool --targets github,google,chatgpt
 ```
 
-Targets live in `sources.json.targets` (github, google, chatgpt, grok, claude, youtube by default). The command writes `site-results.json` and `site-report.md` with a per-node × per-target delay matrix. It requires TUN off for clean numbers.
+Targets live in the editable `targets.json` (github, google, chatgpt, grok, claude, youtube by default). Add or remove entries there; each entry is `{ "name": "short-name", "url": "https://..." }`. Use `--targets name1,name2` to run a subset, or `--targets-file /path/to/custom.json` to use an alternate list. The command writes `site-results.json` and `site-report.md` with a per-node × per-target delay matrix. It requires TUN off for clean numbers.
+
+Adding a target here only changes `site-test`. The subscription config's site groups and routing rules are separate; adding a new site group still requires updating the config and rules. The current groups use static ordered fallback lists derived from the matrix.
 
 Caveat: the delay API treats an HTTP response as reachable. A Cloudflare 403/captcha can still show a delay; this is reachability/latency, not proof that login, streaming, or region unlock works.
 
