@@ -134,13 +134,14 @@ Each is a `fallback` group with the site URL; rules route explicit suffixes (You
 
 ## Current baseline (2026-10-18)
 
-- Sync result: 8 sources, 1659 raw proxy entries → 1327 accepted after cross-source dedupe; 332 duplicates; 650 `skip-cert-verify: true`.
+- Sync result: 9 sources (8 Gists + 1 GitLab wiki), 1662 raw proxy entries → 1327 accepted after cross-source dedupe; 332 duplicates; 650 `skip-cert-verify: true`.
 - All 1327 merged proxies pass `verge-mihomo -t` with Mihomo v1.19.32.
 - Clean TUN-off test: 1327 tested, 581 reachable, 319 at ≤1500 ms; 280 of the 319 usable nodes are `skip-cert-verify: true`.
 - Strict rebuild (`build --exclude-insecure`): 39 usable nodes with no `skip-cert-verify: true`.
 - CA-TLS rebuild (`build --exclude-insecure --ca-tls`): 11 nodes — explicit `tls: true` excluding Reality (10) plus one Hysteria2 TLS node. Reality, plain HTTP/SOCKS5, non-TLS VMess, and Mieru are excluded.
-- Site matrix: 11 tested, 3 dead on all six targets; `tdison/Other_9` best for 5 sites, `rockdale/NL_2` best for YouTube.
-- Published a secret Gist (its ID is stored only in local `publish.json`, not in this repository): `nodes.yaml` (11 CA-TLS proxies) + `clash.yaml` (provider, site fallback groups, rules). The old dead `haidejiang` bootstrap was replaced by `tdison/Other_9`. The original AnyTLS/VMess nodes are gone; the 39- and 319-node versions remain in Gist history.
+- Latest site matrix (11 nodes, 9 targets): 7–9/11 success per target; `tdison/Other_9` and `rockdale/NL_1` dominate, with per-target ordering. Three nodes fail all targets.
+- Published a secret Gist (its ID is stored only in local `publish.json`, not in this repository): `nodes.yaml` (11 CA-TLS proxies) + `clash.yaml` (provider, 9 static site fallback groups, rules, and an `ORIGINAL` legacy group). The old dead `haidejiang` bootstrap was replaced by `tdison/Other_9`. The 39- and 319-node versions remain in Gist history.
+- GitLab wiki source `zhifan-wiki` parses 3 URIs: AnyTLS, VMess, SS. AnyTLS is CA-TLS and delay-tested at 1673 ms; the VMess is non-TLS, its TCP port is open but the delay test currently fails; SS is non-TLS. Both original AnyTLS/VMess nodes are kept in the explicit `ORIGINAL` group, not in the CA-TLS site pool.
 - A fresh sync on 2026-10-18 produced 158 CA-TLS candidates but only 2 at ≤1500 ms. That result was **not** published; the 11-node subscription remains. `publish` now refuses a node count below half the previous count unless `--allow-shrink` is passed, and refuses empty/weakened sets.
 - The old 10-node TUN smoke test was discarded; all current numbers are from the TUN-off run.
 - 2026-10-18 server test: all 11 CA-TLS nodes were unreachable because the server's network path differs. Those results are discarded; this skill is scoped to the Windows PC. No scheduler/cron was created.
@@ -187,8 +188,9 @@ The Gist search HTML is noisy; many hits are one-off config templates or dead po
 | haidejiang | [HAIDEJIANG](https://gist.github.com/HAIDEJIANG/b68d405379a0ffd9b686c6c497b484c1/raw/all.yaml) | irregular, ~1–6h | ~32 nodes; already in this user's profiles |
 | mathdeep | [Mathdeep258](https://gist.github.com/Mathdeep258/007cc1adcae763f9388259f71fea0b40/raw/all.yaml) | irregular, multiple/day | ~15 nodes; already in this user's profiles |
 | fdzz | [fdzzxzxx](https://gist.github.com/fdzzxzxx/c6a98bad66f358daf6d9b0128c4aed74/raw/all.yaml) | 1–2/day with bursts | ~24 nodes; already in this user's profiles |
+| zhifan-wiki | [GitLab wiki](https://gitlab.com/zhifan999/fq/-/wikis/v2ray%E5%85%8D%E8%B4%B9%E8%B4%A6%E5%8F%B7) | manual | 3 URIs (VMess/AnyTLS/SS); AnyTLS CA-TLS, others legacy/non-TLS |
 
-All audited `all.yaml` files are proxies-only (no rules/groups). Re-audit before adding a source: confirm `all.yaml` exists, last update is recent, content is proxies-only, and `updated_at` is advancing. If a source fails three runs or is stale for >7 days, set `enabled: false` and record why in `sources.json`.
+All audited Gist `all.yaml` files are proxies-only (no rules/groups). The GitLab wiki source is different: it fetches `type: gitlab-wiki`, extracts `vmess://`/`anytls://`/`ss://` URIs from all wiki pages, and converts them to proxies-only YAML. It supports VMess, AnyTLS, and SIP002/legacy SS. Names are prefixed with the source tag; the CA-TLS filter keeps AnyTLS and drops VMess/SS. Re-audit before adding a source: confirm `all.yaml` exists, last update is recent, content is proxies-only, and `updated_at` is advancing. If a source fails three runs or is stale for >7 days, set `enabled: false` and record why in `sources.json`.
 
 ## Filtering and test semantics
 
@@ -221,7 +223,7 @@ The default health URL is `https://www.gstatic.com/generate_204`. Change it with
 
 ## Remote-provider bootstrap pitfall
 
-A subscription config that uses `proxy-providers` with a GitHub raw URL plus DNS `#PROXY` can deadlock at startup: the provider is needed to resolve/fetch itself, but DNS wants a proxy. Keep at least one explicit known-good proxy in the `PROXY` group, and list it before any empty provider-backed group. In the current CA-TLS subscription, the first item is a CA-TLS bootstrap node from the same pool (`bootstrap/haidejiang-...`), then `AUTO`, `DIRECT`, then the 11 provider nodes; the original AnyTLS/VMess nodes are gone. The provider `nodes.yaml` loads through the bootstrap and is cached at `./providers/gist-pool.yaml`. Without this fallback, the provider fetch failed with `dns resolve failed`/`EOF`.
+A subscription config that uses `proxy-providers` with a GitHub raw URL plus DNS `#PROXY` can deadlock at startup: the provider is needed to resolve/fetch itself, but DNS wants a proxy. Keep at least one explicit known-good proxy in the `PROXY` group, and list it before any empty provider-backed group. In the current CA-TLS subscription, the first item is a CA-TLS bootstrap node from the same pool (`bootstrap/tdison-Other_9...`), then `AUTO`, the nine site groups, `ORIGINAL`, and `DIRECT`, plus the 11 provider nodes. The `ORIGINAL` group contains the two legacy wiki nodes (AnyTLS and non-TLS VMess). The provider `nodes.yaml` loads through the bootstrap and is cached at `./providers/gist-pool.yaml`. Without this fallback, the provider fetch failed with `dns resolve failed`/`EOF`.
 
 ## Limitations
 

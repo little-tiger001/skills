@@ -120,6 +120,18 @@
       "cadence": "1-2x/day with short retry bursts",
       "lastAudit": "2026-10-18 13:37 +08",
       "notes": "Already present in the user's Clash Verge profiles; HTTP/Hysteria/VLESS/mieru mix."
+    },
+    {
+      "tag": "zhifan-wiki",
+      "type": "gitlab-wiki",
+      "project": "zhifan999/fq",
+      "api": "https://gitlab.com/api/v4/projects/zhifan999%2Ffq/wikis?with_content=1",
+      "priority": 9,
+      "enabled": true,
+      "expectedNodes": 3,
+      "cadence": "manual wiki updates",
+      "lastAudit": "2026-10-18",
+      "notes": "Public GitLab wiki; parses vmess/anytls/ss URIs. AnyTLS is CA-TLS; VMess and SS are non-TLS and only useful as legacy entries."
     }
   ]
 }

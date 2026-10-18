@@ -327,6 +327,176 @@ async function getGistMeta(src, token) {
   }
 }
 
+const yamlq = (v) => JSON.stringify(String(v ?? ''));
+
+function parseVmessUri(uri) {
+  try {
+    const raw = uri.slice('vmess://'.length);
+    const j = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+    if (!j.add || !j.port || !j.id) return null;
+    const tls = String(j.tls || '').toLowerCase() === 'tls' || j.tls === true;
+    const net = String(j.net || 'tcp').toLowerCase();
+    const lines = [
+      `- name: ${yamlq(j.ps || `vmess-${j.add}`)}`,
+      '  type: vmess',
+      `  server: ${yamlq(j.add)}`,
+      `  port: ${Number(j.port)}`,
+      `  uuid: ${yamlq(j.id)}`,
+      `  alterId: ${Number(j.aid || 0)}`,
+      '  cipher: auto',
+      '  udp: true'
+    ];
+    if (tls) {
+      lines.push('  tls: true');
+      const sni = j.sni || j.host;
+      if (sni) lines.push(`  servername: ${yamlq(sni)}`);
+      if (String(j.insecure) === '1' || j.insecure === true) lines.push('  skip-cert-verify: true');
+    }
+    if (net === 'ws') {
+      lines.push('  network: ws', '  ws-opts:', `    path: ${yamlq(j.path || '/')}`);
+      if (j.host) lines.push('    headers:', `      Host: ${yamlq(j.host)}`);
+    } else if (net === 'grpc') {
+      lines.push('  network: grpc', '  grpc-opts:', `    grpc-service-name: ${yamlq(j.path || '')}`);
+    } else if (net !== 'tcp' && net !== 'none' && net) {
+      lines.push(`  network: ${net}`);
+    }
+    return lines.join('\n');
+  } catch { return null; }
+}
+
+function parseAnytlsUri(uri) {
+  try {
+    const u = new URL(uri);
+    const server = u.hostname;
+    const port = Number(u.port || 443);
+    const password = decodeURIComponent(u.username || '');
+    if (!server || !port || !password) return null;
+    const sni = u.searchParams.get('sni') || server;
+    const insecure = ['1', 'true', 'yes'].includes(String(u.searchParams.get('insecure') || u.searchParams.get('allowInsecure') || '').toLowerCase());
+    const name = u.hash ? decodeURIComponent(u.hash.slice(1)) : `anytls-${server}`;
+    return [
+      `- name: ${yamlq(name)}`,
+      '  type: anytls',
+      `  server: ${yamlq(server)}`,
+      `  port: ${port}`,
+      `  password: ${yamlq(password)}`,
+      `  sni: ${yamlq(sni)}`,
+      '  client-fingerprint: chrome',
+      `  skip-cert-verify: ${insecure ? 'true' : 'false'}`,
+      '  udp: true'
+    ].join('\n');
+  } catch { return null; }
+}
+
+function parseSsUri(uri) {
+  try {
+    let raw = uri.slice('ss://'.length);
+    let name = '';
+    const hash = raw.indexOf('#');
+    if (hash >= 0) {
+      name = decodeURIComponent(raw.slice(hash + 1));
+      raw = raw.slice(0, hash);
+    }
+    let method = '', password = '', host = '', port = 0;
+    if (raw.includes('@')) {
+      const at = raw.lastIndexOf('@');
+      let user = raw.slice(0, at);
+      const server = raw.slice(at + 1);
+      let decoded;
+      if (user.includes(':') || user.includes('%3A')) decoded = decodeURIComponent(user);
+      else decoded = Buffer.from(user, 'base64').toString('utf8');
+      const idx = decoded.indexOf(':');
+      method = decoded.slice(0, idx);
+      password = decoded.slice(idx + 1);
+      const u = new URL(`http://${server}`);
+      host = u.hostname;
+      port = Number(u.port);
+    } else {
+      const decoded = Buffer.from(raw, 'base64').toString('utf8');
+      const at = decoded.lastIndexOf('@');
+      const user = decoded.slice(0, at);
+      const server = decoded.slice(at + 1);
+      const idx = user.indexOf(':');
+      method = user.slice(0, idx);
+      password = user.slice(idx + 1);
+      const u = new URL(`http://${server}`);
+      host = u.hostname;
+      port = Number(u.port);
+    }
+    if (!method || !host || !port) return null;
+    return [
+      `- name: ${yamlq(name || `ss-${host}`)}`,
+      '  type: ss',
+      `  server: ${yamlq(host)}`,
+      `  port: ${port}`,
+      `  cipher: ${yamlq(method)}`,
+      `  password: ${yamlq(password)}`,
+      '  udp: true'
+    ].join('\n');
+  } catch { return null; }
+}
+
+function parseUriNode(uri) {
+  if (uri.startsWith('vmess://')) return parseVmessUri(uri);
+  if (uri.startsWith('anytls://')) return parseAnytlsUri(uri);
+  if (uri.startsWith('ss://')) return parseSsUri(uri);
+  return null;
+}
+
+async function syncWikiSource(out, src, state, o) {
+  const c = cachePaths(out, src);
+  ensureDir(c.dir);
+  const api = src.api || `https://gitlab.com/api/v4/projects/${encodeURIComponent(src.project)}/wikis?with_content=1`;
+  let pages;
+  try {
+    pages = JSON.parse(await fetchTextWithTimeout(api, { 'User-Agent': 'clash-gist-pool/1.0' }, 30000));
+  } catch (e) {
+    if (fs.existsSync(c.file)) {
+      const content = fs.readFileSync(c.file, 'utf8');
+      const items = extractProxies(content);
+      state.sources[src.tag] = { ...(state.sources[src.tag] || {}), status: 'stale-cache', error: String(e.message || e) };
+      warn(`[sync] ${src.tag}: ${e.message} — using stale cache (${items.length} items)`);
+      return { src, content, items, gist: { updated_at: state.sources[src.tag]?.updated_at || '', description: 'GitLab wiki (stale cache)' }, status: 'stale-cache' };
+    }
+    throw e;
+  }
+  const wanted = Array.isArray(src.pages) ? new Set(src.pages) : null;
+  const uris = new Set();
+  for (const page of pages) {
+    if (wanted && !wanted.has(page.title) && !wanted.has(page.slug)) continue;
+    const text = String(page.content || '').replace(/&amp;/g, '&');
+    const re = /(vmess|anytls|ss):\/\/[^\s"'<`]+/g;
+    let m;
+    while ((m = re.exec(text))) uris.add(m[0]);
+  }
+  const blocks = [];
+  const skipped = {};
+  for (const uri of uris) {
+    const block = parseUriNode(uri);
+    if (block) blocks.push(block);
+    else skipped[uri.split('://')[0]] = (skipped[uri.split('://')[0]] || 0) + 1;
+  }
+  const content = blocks.length ? `proxies:\n${blocks.map(b => indentBlock(b, 2)).join('\n')}\n` : 'proxies: []\n';
+  writeText(c.file, content);
+  const now = new Date().toISOString();
+  const items = extractProxies(content);
+  state.sources[src.tag] = {
+    updated_at: now,
+    fetched_at: now,
+    sha256: sha256(content),
+    items: items.length,
+    size: Buffer.byteLength(content),
+    history: [],
+    status: 'updated',
+    error: null,
+    sourceType: 'gitlab-wiki',
+    skipped
+  };
+  writeJson(c.meta, { ...state.sources[src.tag], description: `GitLab wiki ${src.project}` });
+  log(`[sync] ${src.tag} wiki ${src.project}: parsed ${uris.size} URIs -> ${items.length} proxies`);
+  return { src, content, items, gist: { updated_at: now, description: `GitLab wiki ${src.project}` }, status: 'updated' };
+}
+
 async function syncSources(out, o) {
   const allSources = loadSources();
   const sources = allSources
@@ -341,6 +511,17 @@ async function syncSources(out, o) {
   const errors = [];
 
   for (const src of sources) {
+    if ((src.type || 'gist') === 'gitlab-wiki') {
+      try {
+        const entry = await syncWikiSource(out, src, state, o);
+        entries.push(entry);
+      } catch (e) {
+        state.sources[src.tag] = { ...(state.sources[src.tag] || {}), status: 'error', error: String(e.message || e) };
+        errors.push({ tag: src.tag, error: String(e.message || e) });
+        warn(`[sync] ${src.tag}: ${e.message}`);
+      }
+      continue;
+    }
     const c = cachePaths(out, src);
     ensureDir(c.dir);
     let gist = null;
