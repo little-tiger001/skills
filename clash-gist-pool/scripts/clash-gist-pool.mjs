@@ -906,6 +906,155 @@ async function runTests(out, o, pool) {
   }
 }
 
+function loadTargets(o) {
+  const cfg = readJson(SOURCES_PATH, {});
+  const all = Array.isArray(cfg.targets) ? cfg.targets : [];
+  const names = o.targets ? String(o.targets).split(',').map(s => s.trim()).filter(Boolean) : null;
+  return names ? all.filter(t => names.includes(t.name)) : all;
+}
+
+function writeSiteReport(out, ctx) {
+  const { results, targets, coreVersion, tun, allowTun } = ctx;
+  const lines = [];
+  lines.push('# Site latency report', '');
+  lines.push(`- Generated: ${new Date().toISOString()}`);
+  lines.push(`- Core: ${coreVersion}`);
+  lines.push(`- Tested nodes: ${results.length}`);
+  if (tun) lines.push(`- WARNING: TUN adapter detected (${tun}); results are contaminated.`);
+  lines.push('');
+  lines.push('## Targets', '');
+  lines.push('| Target | URL | OK | Median |');
+  lines.push('|---|---|---:|---:|');
+  for (const t of targets) {
+    const ds = results.map(r => r.targets[t.name]).filter(x => x && x.ok).map(x => x.delay).sort((a, b) => a - b);
+    const med = ds.length ? ds[Math.floor(ds.length / 2)] : null;
+    lines.push(`| ${t.name} | ${t.url} | ${ds.length}/${results.length} | ${med === null ? '-' : med + ' ms'} |`);
+  }
+  lines.push('');
+  lines.push('## Matrix', '');
+  const header = ['Node', 'Type', ...targets.map(t => t.name)];
+  lines.push(`| ${header.join(' | ')} |`);
+  lines.push(`|${header.map(() => '---').join('|')}|`);
+  const sorted = [...results].sort((a, b) => {
+    const avg = r => {
+      const ds = Object.values(r.targets).filter(x => x && x.ok).map(x => x.delay);
+      return ds.length ? ds.reduce((n, x) => n + x, 0) / ds.length : 99999;
+    };
+    return avg(a) - avg(b);
+  });
+  for (const r of sorted) {
+    const cells = targets.map(t => {
+      const x = r.targets[t.name];
+      return x && x.ok ? `${x.delay} ms` : '×';
+    });
+    lines.push(`| ${String(r.name).replace(/\|/g, '\\|')} | ${r.type || '-'} | ${cells.join(' | ')} |`);
+  }
+  lines.push('');
+  lines.push('## Notes', '');
+  lines.push('- The delay API sends an HTTP request through the proxy to the target URL; it is not just a TCP handshake to the proxy server.');
+  lines.push('- A 403/Cloudflare/captcha page may still count as a successful delay. This measures reachability/latency, not account access, streaming availability, or region unlock.');
+  lines.push('- Use TUN off for clean numbers; a TUN detection warning means the test traffic may be double-proxied.');
+  lines.push('');
+  writeText(path.join(out, 'site-report.md'), lines.join('\n'));
+}
+
+async function siteTest(out, o) {
+  const usablePath = path.join(out, 'usable.yaml');
+  if (!fs.existsSync(usablePath)) throw new Error('missing usable.yaml; run pipeline/test first');
+  const targets = loadTargets(o);
+  if (!targets.length) throw new Error('no targets matched');
+  const meta = readJson(path.join(out, 'usable-meta.json'), []);
+  const byName = new Map(meta.map(m => [m.name, m]));
+  let records = extractProxies(fs.readFileSync(usablePath, 'utf8')).map(item => {
+    const p = parseProxyBlock(item.text);
+    return { ...p, block: item.text, source: byName.get(p.name)?.source || '' };
+  }).filter(r => r.name && r.block);
+  if (o.source) records = records.filter(r => r.source === o.source);
+  if (o.type) {
+    const types = new Set(String(o.type).split(',').map(s => s.trim().toLowerCase()));
+    records = records.filter(r => types.has(r.type));
+  }
+  const limit = num(o.limit, 0);
+  if (limit > 0) records = records.slice(0, limit);
+  if (!records.length) throw new Error('no proxies selected for site test');
+
+  const tun = detectTun();
+  if (tun && !bool(o['allow-tun'])) {
+    throw new Error(`TUN adapter is up (${tun}). Turn off TUN before site-test, or pass --allow-tun for a contaminated smoke test.`);
+  }
+  const core = findCore(o);
+  const ver = coreVersion(core);
+  if (tun) warn(`[site-test] WARNING: TUN adapter is up (${tun}); results are contaminated.`);
+  const ports = await findFreePorts(num(o['mixed-port'], 17990), num(o['api-port'], 19090));
+  const testDir = path.join(out, 'site-test');
+  ensureDir(testDir);
+  const dataDir = path.join(testDir, 'data');
+  ensureDir(dataDir);
+  const cfgPath = path.join(testDir, 'config.yaml');
+  const coreLogPath = path.join(testDir, 'core.log');
+  writeText(cfgPath, testConfigText(ports, records));
+  const check = spawnSync(core, ['-t', '-f', cfgPath, '-d', dataDir], { encoding: 'utf8', timeout: 90000, windowsHide: true });
+  if (check.status !== 0) {
+    const detail = tail(`${check.stdout || ''}\n${check.stderr || ''}`, 4000);
+    writeText(path.join(testDir, 'validate.log'), detail);
+    throw new Error(`core config validation failed. See ${path.join(testDir, 'validate.log')}\n${detail}`);
+  }
+
+  const logStream = fs.createWriteStream(coreLogPath, { flags: 'w' });
+  const child = spawn(core, ['-d', dataDir, '-f', cfgPath], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  child.stdout.pipe(logStream);
+  child.stderr.pipe(logStream);
+  let stopRequested = false;
+  const stop = async () => {
+    if (stopRequested) return;
+    stopRequested = true;
+    try { child.kill(); } catch {}
+    await sleep(400);
+    if (child.exitCode === null && process.platform === 'win32') {
+      try { execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' }); } catch {}
+    }
+  };
+
+  try {
+    await waitForApi(ports.api, child);
+    const timeout = num(o.timeout, 5000);
+    const concurrency = Math.max(1, num(o.concurrency, 8));
+    let done = 0;
+    log(`[site-test] ${records.length} proxies x ${targets.length} targets, concurrency ${concurrency}`);
+    const results = await mapPool(records, concurrency, async (r) => {
+      const row = { name: r.name, source: r.source, type: r.type, targets: {} };
+      for (const t of targets) {
+        try {
+          const apiPath = `/proxies/${encodeURIComponent(r.name)}/delay?url=${encodeURIComponent(t.url)}&timeout=${timeout}`;
+          const res = await apiGet(ports.api, apiPath, timeout + 4000);
+          const delay = Number(res.delay);
+          row.targets[t.name] = Number.isFinite(delay) && delay > 0
+            ? { ok: true, delay }
+            : { ok: false, error: res.message || 'no delay' };
+        } catch (e) {
+          row.targets[t.name] = { ok: false, error: tail(e.message || String(e), 200) };
+        }
+      }
+      done++;
+      process.stderr.write(`\r[site-test] ${done}/${records.length}`);
+      return row;
+    });
+    process.stderr.write('\n');
+    writeJson(path.join(out, 'site-results.json'), {
+      generatedAt: new Date().toISOString(),
+      coreVersion: ver,
+      targets,
+      results
+    });
+    writeSiteReport(out, { results, targets, coreVersion: ver, tun, allowTun: bool(o['allow-tun']) });
+    log(`[site-test] report -> ${path.join(out, 'site-report.md')}`);
+    return results;
+  } finally {
+    await stop();
+    logStream.end();
+  }
+}
+
 async function publishGist(out, o) {
   const usablePath = path.join(out, 'usable.yaml');
   if (!fs.existsSync(usablePath)) throw new Error(`missing ${usablePath}; run test first`);
@@ -1014,6 +1163,7 @@ async function main() {
   node scripts/clash-gist-pool.mjs test [--limit N] [--source TAG] [--type http,vless]
   node scripts/clash-gist-pool.mjs build [--max-delay MS]   # rebuild usable.yaml from last results
   node scripts/clash-gist-pool.mjs run  [--limit N]
+  node scripts/clash-gist-pool.mjs site-test [--targets github,google] [--limit N]
   node scripts/clash-gist-pool.mjs discover [--add] [--max-pages N] [--max-candidates N]
   node scripts/clash-gist-pool.mjs pipeline [--discover] [--publish] [--exclude-insecure] [--ca-tls]
   node scripts/clash-gist-pool.mjs publish [--gist ID] [--create] [--description TEXT]
@@ -1028,7 +1178,8 @@ Common options:
   --timeout MS           per-proxy delay timeout (default 5000)
   --concurrency N        parallel delay tests (default 16)
   --attempts N           attempts per proxy (default 1)
-  --url URL              health-check URL
+  --url URL              health-check URL for test/pipeline
+  --targets LIST         site-test target names (default: all in sources.json)
   --max-delay MS         usable threshold (default 1500)
   --limit N              test/build only first N proxies
   --force                refetch even if updated_at is unchanged
@@ -1075,6 +1226,11 @@ Common options:
     buildUsable(out, o, results, records);
     writeReport(out, o, { coreVersion: 'from previous test', tun: detectTun(), allowTun: false, state: readJson(path.join(out, 'state.json'), {}) });
     log(`[build] report -> ${path.join(out, 'report.md')}`);
+    return;
+  }
+
+  if (cmd === 'site-test') {
+    await siteTest(out, o);
     return;
   }
 

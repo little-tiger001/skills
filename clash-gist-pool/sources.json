@@ -16,6 +16,32 @@
     "minCaTls": 1,
     "maxCandidates": 40
   },
+  "targets": [
+    {
+      "name": "github",
+      "url": "https://github.com/robots.txt"
+    },
+    {
+      "name": "google",
+      "url": "https://www.google.com/generate_204"
+    },
+    {
+      "name": "chatgpt",
+      "url": "https://chatgpt.com/robots.txt"
+    },
+    {
+      "name": "grok",
+      "url": "https://grok.com/robots.txt"
+    },
+    {
+      "name": "claude",
+      "url": "https://claude.ai/robots.txt"
+    },
+    {
+      "name": "youtube",
+      "url": "https://www.youtube.com/robots.txt"
+    }
+  ],
   "sources": [
     {
       "tag": "rockdale",

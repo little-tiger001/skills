@@ -37,6 +37,7 @@ Output defaults to `./gist-pool/`:
 - `usable.yaml` — proxies whose delay passed, sorted by delay.
 - `results.json` / `usable-meta.json` — test data, no credentials beyond names/endpoints.
 - `report.md` — source counts, cadence, fastest nodes, failures, warnings.
+- `site-results.json` / `site-report.md` — per-node delay matrix for github/google/chatgpt/grok/claude/youtube after `site-test`.
 - `discovered.json` / `discovered.md` — candidates from `discover`, with node/insecure/CA-TLS counts.
 - `test/` — generated test config and core log.
 - `.gitignore` — ignores everything in the output dir; do not commit node credentials.
@@ -46,6 +47,7 @@ Output defaults to `./gist-pool/`:
 ```text
 sync                 fetch sources, dedupe/filter, write merged.yaml + report
 test                 load merged.yaml (sync if missing), delay-test, write usable.yaml
+site-test            test the current usable.yaml against per-site target URLs
 build                rebuild usable.yaml/report from the last results.json (no retest)
 run                  sync then test in one process
 discover             search Gist for new candidates, audit them, write discovered.md
@@ -54,7 +56,7 @@ publish              upload usable.yaml as nodes.yaml to a secret Gist
 status               show cached source state
 ```
 
-Common options: `--out DIR`, `--source TAG`, `--force`, `--limit N`, `--type http,vless`, `--exclude-insecure`, `--ca-tls`, `--timeout MS`, `--concurrency N`, `--attempts N`, `--url URL`, `--max-delay MS`, `--core PATH`, `--allow-tun`, `--mixed-port`, `--api-port`.
+Common options: `--out DIR`, `--source TAG`, `--force`, `--limit N`, `--type http,vless`, `--exclude-insecure`, `--ca-tls`, `--timeout MS`, `--concurrency N`, `--attempts N`, `--url URL`, `--targets github,google`, `--max-delay MS`, `--core PATH`, `--allow-tun`, `--mixed-port`, `--api-port`.
 
 Discovery/pipeline options: `--add`, `--discover`, `--publish`, `--query "all.yaml+proxies,..."`, `--max-pages N`, `--max-candidates N`, `--max-age-days N`, `--min-nodes N`, `--min-ca-tls N`, `--no-test`, `--gist ID` (or `GIST_ID` env). `pipeline` uses the same filter flags as `sync`/`build`; use `--exclude-insecure --ca-tls` for the current 11-node subscription. `--add` only appends discovered sources with `enabled: false`; review `discovered.md` before enabling.
 
@@ -96,6 +98,20 @@ node $skill publish --out .\gist-pool
 `pipeline` syncs, applies the CA-TLS filter, tests the selected nodes, and writes `usable.yaml`; `--publish` can be appended to do the Gist update in one step. The Gist `clash.yaml` (provider, bootstrap, rules) is not rewritten; only `nodes.yaml` is updated.
 
 Do not enable TUN while testing. The old Linux wrapper/cron workflow was removed; server results are not comparable.
+
+## Site-specific latency
+
+The ordinary `test`/`pipeline` delay is already an HTTP request **through the proxy** to `https://www.gstatic.com/generate_204`; it is not just a TCP handshake to the proxy server. To measure target-site reachability/latency, run `site-test` against the current `usable.yaml`:
+
+```powershell
+node $skill site-test --out .\gist-pool
+# or a subset:
+node $skill site-test --out .\gist-pool --targets github,google,chatgpt
+```
+
+Targets live in `sources.json.targets` (github, google, chatgpt, grok, claude, youtube by default). The command writes `site-results.json` and `site-report.md` with a per-node × per-target delay matrix. It requires TUN off for clean numbers.
+
+Caveat: the delay API treats an HTTP response as reachable. A Cloudflare 403/captcha can still show a delay; this is reachability/latency, not proof that login, streaming, or region unlock works.
 
 - `--exclude-insecure` drops `skip-cert-verify: true` nodes. Use it with `sync` to rebuild the pool, or with `build` to filter the existing results without re-testing (e.g. `build --exclude-insecure`). Many sources lose 30–98% of their nodes; in the 2026-10-18 pool this cut 319 usable nodes to 39.
 - `--ca-tls` keeps only CA-verified TLS nodes: explicit `tls: true` excluding Reality, plus TLS-inherent protocols (`trojan`, `hysteria`, `hysteria2`, `tuic`, `anytls`). It excludes plain HTTP/SOCKS5, non-TLS VMess, Mieru, and Reality. With the current results this cuts the strict 39 to 11. Use `build --exclude-insecure --ca-tls` to rebuild from results; keep a CA-TLS fallback node in the subscription so the provider can bootstrap.
