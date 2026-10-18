@@ -62,7 +62,7 @@ Discovery/pipeline options: `--add`, `--discover`, `--publish`, `--query "all.ya
 
 `publish --create` creates a new **secret** Gist with `nodes.yaml` (the current `usable.yaml`) and writes `gist-pool/publish.json` with its id/raw URL. Later `publish` calls PATCH the same Gist using that state. The nodes file is proxies-only; use its raw URL in a `proxy-providers` entry, or point your subscription config at it. The Gist is unlisted, not access-controlled: anyone with the raw URL can read it.
 
-`publish` refuses to upload when `usable.yaml` has no proxies, when it still contains `skip-cert-verify: true` nodes, or (for a CA-TLS subscription) when it contains non-CA-TLS/Reality/plain nodes. Run `build --exclude-insecure --ca-tls` first; the override flags for the latter two are `--allow-insecure` and `--allow-non-ca-tls`. This prevents a failed test run from replacing a working subscription with an empty or weakened one.
+`publish` refuses to upload when `usable.yaml` has no proxies, when it still contains `skip-cert-verify: true` nodes, when a CA-TLS subscription contains non-CA-TLS/Reality/plain nodes, or when the new count is below half the previous `nodes_count`. Run `build --exclude-insecure --ca-tls` first; the override flags are `--allow-insecure`, `--allow-non-ca-tls`, and `--allow-shrink`. This prevents a failed test run from replacing a working subscription with an empty, weakened, or unexpectedly tiny pool.
 
 Minimal provider wiring for a subscription config:
 
@@ -113,6 +113,17 @@ Targets live in `sources.json.targets` (github, google, chatgpt, grok, claude, y
 
 Caveat: the delay API treats an HTTP response as reachable. A Cloudflare 403/captcha can still show a delay; this is reachability/latency, not proof that login, streaming, or region unlock works.
 
+Current site matrix (2026-10-18, 11 CA-TLS nodes, TUN off): 3 nodes were dead on all six targets. `tdison/Other_9` was best for github/google/chatgpt/grok/claude; `rockdale/NL_2` was best for youtube. Dynamic per-site `url-test` groups were observed to pick inconsistent nodes (for example a dead bootstrap for YouTube), so the subscription uses **static ordered fallback groups** built from the matrix instead:
+
+- GITHUB: Other_9, Other_8, NL_1, US_58
+- GOOGLE: Other_9, NL_1, NL_2, NL_63, US_58
+- CHATGPT: Other_9, NL_2, US_58, NL_1
+- GROK: Other_9, US_58, Other_8, NL_2
+- CLAUDE: Other_9, Other_8, US_58, NL_63, NL_1, US_33
+- YOUTUBE: NL_2, Other_8, Other_9, US_58
+
+Each is a `fallback` group with the site URL; rules route explicit suffixes (YouTube before Google, GitHub, OpenAI/ChatGPT, Grok, Claude). Re-run `site-test` and update these ordered lists when the node snapshot changes. The groups use explicit copies of the selected nodes because provider node names cannot be referenced directly in a group without `use`.
+
 - `--exclude-insecure` drops `skip-cert-verify: true` nodes. Use it with `sync` to rebuild the pool, or with `build` to filter the existing results without re-testing (e.g. `build --exclude-insecure`). Many sources lose 30–98% of their nodes; in the 2026-10-18 pool this cut 319 usable nodes to 39.
 - `--ca-tls` keeps only CA-verified TLS nodes: explicit `tls: true` excluding Reality, plus TLS-inherent protocols (`trojan`, `hysteria`, `hysteria2`, `tuic`, `anytls`). It excludes plain HTTP/SOCKS5, non-TLS VMess, Mieru, and Reality. With the current results this cuts the strict 39 to 11. Use `build --exclude-insecure --ca-tls` to rebuild from results; keep a CA-TLS fallback node in the subscription so the provider can bootstrap.
 - `--limit` applies to the test/build selection, not to sync.
@@ -126,10 +137,11 @@ Caveat: the delay API treats an HTTP response as reachable. A Cloudflare 403/cap
 - Clean TUN-off test: 1327 tested, 581 reachable, 319 at ≤1500 ms; 280 of the 319 usable nodes are `skip-cert-verify: true`.
 - Strict rebuild (`build --exclude-insecure`): 39 usable nodes with no `skip-cert-verify: true`.
 - CA-TLS rebuild (`build --exclude-insecure --ca-tls`): 11 nodes — explicit `tls: true` excluding Reality (10) plus one Hysteria2 TLS node. Reality, plain HTTP/SOCKS5, non-TLS VMess, and Mieru are excluded.
-- Published a secret Gist (its ID is stored only in local `publish.json`, not in this repository): `nodes.yaml` (11 CA-TLS proxies) + `clash.yaml` (subscription with provider). The original AnyTLS/VMess nodes were removed; `PROXY` uses one CA-TLS bootstrap node, then `AUTO`/`DIRECT`, plus the provider nodes. The 39- and 319-node versions remain in Gist history.
-- `publish` now refuses insecure nodes and, when `publish.json.ca_tls` is true, refuses non-CA-TLS/Reality/plain nodes unless the corresponding override flag is passed.
+- Site matrix: 11 tested, 3 dead on all six targets; `tdison/Other_9` best for 5 sites, `rockdale/NL_2` best for YouTube.
+- Published a secret Gist (its ID is stored only in local `publish.json`, not in this repository): `nodes.yaml` (11 CA-TLS proxies) + `clash.yaml` (provider, site fallback groups, rules). The old dead `haidejiang` bootstrap was replaced by `tdison/Other_9`. The original AnyTLS/VMess nodes are gone; the 39- and 319-node versions remain in Gist history.
+- A fresh sync on 2026-10-18 produced 158 CA-TLS candidates but only 2 at ≤1500 ms. That result was **not** published; the 11-node subscription remains. `publish` now refuses a node count below half the previous count unless `--allow-shrink` is passed, and refuses empty/weakened sets.
 - The old 10-node TUN smoke test was discarded; all current numbers are from the TUN-off run.
-- 2026-10-18 server test: all 11 CA-TLS nodes were unreachable because the server's network path differs. Those results are discarded; this skill is now scoped to the Windows PC. No scheduler/cron was created.
+- 2026-10-18 server test: all 11 CA-TLS nodes were unreachable because the server's network path differs. Those results are discarded; this skill is scoped to the Windows PC. No scheduler/cron was created.
 
 ## Finding new sources (first step)
 

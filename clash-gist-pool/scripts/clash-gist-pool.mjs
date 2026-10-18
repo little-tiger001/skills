@@ -1069,6 +1069,13 @@ async function publishGist(out, o) {
     throw new Error(`usable.yaml has ${insecure} skip-cert-verify:true nodes; run build --exclude-insecure first, or pass --allow-insecure`);
   }
   const publishState = readJson(path.join(out, 'publish.json'), null);
+  const prevCount = Number(publishState?.nodes_count || 0);
+  if (prevCount > 0) {
+    const minKeep = Math.max(3, Math.floor(prevCount * 0.5));
+    if (meta.length < minKeep && !bool(o['allow-shrink'])) {
+      throw new Error(`refusing to shrink subscription from ${prevCount} to ${meta.length} nodes (minimum ${minKeep}); pass --allow-shrink intentionally`);
+    }
+  }
   const caTls = bool(o['ca-tls']) || !!publishState?.ca_tls;
   if (caTls) {
     const bad = extractProxies(content)
@@ -1185,6 +1192,7 @@ Common options:
   --force                refetch even if updated_at is unchanged
   --allow-insecure       allow publish even if usable.yaml still has insecure nodes
   --allow-non-ca-tls     allow publish to a CA-TLS subscription with non-CA-TLS nodes
+  --allow-shrink         allow publishing fewer than half of the previous node count
 `);
     return;
   }
