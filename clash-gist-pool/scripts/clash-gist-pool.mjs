@@ -910,6 +910,10 @@ async function publishGist(out, o) {
   const usablePath = path.join(out, 'usable.yaml');
   if (!fs.existsSync(usablePath)) throw new Error(`missing ${usablePath}; run test first`);
   const content = fs.readFileSync(usablePath, 'utf8');
+  const usableItems = extractProxies(content);
+  if (usableItems.length === 0) {
+    throw new Error('usable.yaml has no proxies; refusing to publish an empty nodes.yaml');
+  }
   const meta = readJson(path.join(out, 'usable-meta.json'), []);
   const insecure = meta.filter(x => x && x.insecure).length;
   if (insecure > 0 && !bool(o['allow-insecure'])) {

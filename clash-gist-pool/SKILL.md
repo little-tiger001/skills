@@ -10,35 +10,25 @@ Sync proxies-only `all.yaml` files from the curated public Gists in `sources.jso
 ## Preconditions
 
 - Node >= 20 (tested on v24).
-- A Mihomo/Clash Verge core. Auto-detected at `C:\Program Files\Clash Verge\verge-mihomo.exe`, `~/.local/bin/mihomo`, `/usr/local/bin/mihomo`, etc.; override with `--core` or `MIHOMO_BIN`. A headless Linux server only needs the standalone core, not Clash/Clash Verge.
+- A Mihomo/Clash Verge core. On this PC it is `C:\Program Files\Clash Verge\verge-mihomo.exe`; override with `--core` or `MIHOMO_BIN`.
 - Optional GitHub token: `GITHUB_TOKEN`, or the existing `~/.agents/skills/github-account/.env`. Public gists work unauthenticated but rate-limit quickly.
-- For clean delay tests, **turn off TUN**. Keep system proxy on if GitHub is only reachable through it; the test core uses raw sockets and is not affected by the system proxy. `sync` can run with TUN on; `test` uses the cached merge and needs TUN off. On Linux the TUN check is not automatic; ensure no TUN/VPN captures the test core's traffic.
+- For clean delay tests, **turn off TUN**. Keep system proxy on if GitHub is only reachable through it; the test core uses raw sockets and is not affected by the system proxy. `sync` can run with TUN on; `test` uses the cached merge and needs TUN off.
+- **Scope:** validated on this Windows PC (Clash Verge, local campus network). A Linux server test failed for all nodes because its network path differs; do not use those results. No cron/Task Scheduler entry is created.
 - Free nodes are untrusted. Do not use this pool for banking, primary email, GitHub, or other sensitive accounts.
 
-## Quick start
+## Quick start (this Windows PC)
 
-Run from the directory where the output should live (for this user, the proxy config directory):
-
-```bash
-node "$HOME/.agents/skills/clash-gist-pool/scripts/clash-gist-pool.mjs" status
-node "$HOME/.agents/skills/clash-gist-pool/scripts/clash-gist-pool.mjs" sync
-# turn TUN off, then:
-node "$HOME/.agents/skills/clash-gist-pool/scripts/clash-gist-pool.mjs" test
-# or run a smoke test first:
-node ".../clash-gist-pool.mjs" test --limit 20 --allow-tun
+```powershell
+cd "C:\Users\zhang\科大云盘\self-improve\折腾\代理配置"
+$skill = "$env:USERPROFILE\.agents\skills\clash-gist-pool\scripts\clash-gist-pool.mjs"
+node $skill status
+# turn TUN off before the test stage
+node $skill pipeline --out .\gist-pool --exclude-insecure --ca-tls
+# inspect gist-pool\report.md and usable.yaml, then:
+node $skill publish --out .\gist-pool
 ```
 
-On Windows PowerShell, use `node "$env:USERPROFILE\.agents\skills\clash-gist-pool\scripts\clash-gist-pool.mjs" ...`.
-
-On a headless Linux server:
-
-```bash
-bash "$HOME/.agents/skills/clash-gist-pool/scripts/install-mihomo.sh"
-export MIHOMO_BIN="$HOME/.local/bin/mihomo"
-export GIST_ID=<YOUR_GIST_ID>
-export GITHUB_TOKEN=...   # or create ~/.agents/skills/github-account/.env
-node "$HOME/.agents/skills/clash-gist-pool/scripts/clash-gist-pool.mjs" pipeline --out "$HOME/gist-pool" --exclude-insecure --ca-tls --publish
-```
+This machine is the reference environment. Do not port a failed server result back; the local CA-TLS subscription is the validated one. No scheduled task or cron is configured.
 
 Output defaults to `./gist-pool/`:
 
@@ -70,7 +60,7 @@ Discovery/pipeline options: `--add`, `--discover`, `--publish`, `--query "all.ya
 
 `publish --create` creates a new **secret** Gist with `nodes.yaml` (the current `usable.yaml`) and writes `gist-pool/publish.json` with its id/raw URL. Later `publish` calls PATCH the same Gist using that state. The nodes file is proxies-only; use its raw URL in a `proxy-providers` entry, or point your subscription config at it. The Gist is unlisted, not access-controlled: anyone with the raw URL can read it.
 
-`publish` refuses to upload when `usable.yaml` still contains `skip-cert-verify: true` nodes. Run `build --exclude-insecure` first, or pass `--allow-insecure` intentionally. If `publish.json.ca_tls` is true (or `--ca-tls` is passed), it also refuses non-CA-TLS/Reality/plain nodes unless `--allow-non-ca-tls` is passed. This prevents a normal test from silently replacing a strict subscription.
+`publish` refuses to upload when `usable.yaml` has no proxies, when it still contains `skip-cert-verify: true` nodes, or (for a CA-TLS subscription) when it contains non-CA-TLS/Reality/plain nodes. Run `build --exclude-insecure --ca-tls` first; the override flags for the latter two are `--allow-insecure` and `--allow-non-ca-tls`. This prevents a failed test run from replacing a working subscription with an empty or weakened one.
 
 Minimal provider wiring for a subscription config:
 
@@ -89,36 +79,23 @@ proxy-providers:
 
 Point a proxy group at it with `use: [pool]`. Updating `nodes.yaml` via `publish` updates the subscription without changing the config file.
 
-## Headless Linux pipeline
+## Local Windows workflow (this machine)
 
-The server only needs Node, a standalone Mihomo core, and network access; no Clash/Clash Verge, no TUN, no GUI. Install the core with `scripts/install-mihomo.sh` (default v1.19.32, override with `MIHOMO_VERSION`), then:
+Run manually from `C:\Users\zhang\科大云盘\self-improve\折腾\代理配置`. No scheduled task or cron is configured.
 
-```bash
-export MIHOMO_BIN="$HOME/.local/bin/mihomo"
-export GIST_ID=<YOUR_GIST_ID>
-export GITHUB_TOKEN=...             # or ~/.agents/skills/github-account/.env
-export GIST_POOL_OUT="$HOME/gist-pool"
-
-# one full run: sync, CA-TLS filter, test selected nodes, publish nodes.yaml
-"$HOME/.agents/skills/clash-gist-pool/scripts/run-pipeline.sh"
+```powershell
+$skill = "$env:USERPROFILE\.agents\skills\clash-gist-pool\scripts\clash-gist-pool.mjs"
+node $skill status
+node $skill discover --out .\gist-pool --add     # optional: candidates added disabled
+# review gist-pool\discovered.md, enable promising sources in sources.json
+node $skill pipeline --out .\gist-pool --exclude-insecure --ca-tls
+# inspect gist-pool\report.md and gist-pool\usable.yaml
+node $skill publish --out .\gist-pool
 ```
 
-The wrapper runs `pipeline --exclude-insecure --ca-tls --publish` and publishes only `nodes.yaml`; the Gist's `clash.yaml` stays unchanged. If the Gist is reachable directly from the server, no proxy is needed; if not, make GitHub API/raw reachable first.
+`pipeline` syncs, applies the CA-TLS filter, tests the selected nodes, and writes `usable.yaml`; `--publish` can be appended to do the Gist update in one step. The Gist `clash.yaml` (provider, bootstrap, rules) is not rewritten; only `nodes.yaml` is updated.
 
-For weekly source discovery, set `DISCOVER=1`; new candidates are added to `sources.json` with `enabled: false` and written to `discovered.md`. Review the counts, enable promising sources, then run the pipeline again:
-
-```bash
-DISCOVER=1 "$HOME/.agents/skills/clash-gist-pool/scripts/run-pipeline.sh"
-```
-
-Example cron (daily 04:17, with discovery on Sundays via a second entry):
-
-```cron
-17 4 * * *  GIST_ID=<YOUR_GIST_ID> MIHOMO_BIN=/home/USER/.local/bin/mihomo /home/USER/.agents/skills/clash-gist-pool/scripts/run-pipeline.sh >> /home/USER/gist-pool/pipeline.log 2>&1
-17 3 * * 0  DISCOVER=1 GIST_ID=<YOUR_GIST_ID> MIHOMO_BIN=/home/USER/.local/bin/mihomo /home/USER/.agents/skills/clash-gist-pool/scripts/run-pipeline.sh >> /home/USER/gist-pool/discover.log 2>&1
-```
-
-Use absolute paths in cron, create the log directory first (`mkdir -p /home/USER/gist-pool`), and keep the token in a protected env file rather than the crontab. If Node is not on cron's PATH, set `NODE_BIN=/absolute/path/to/node`. The server's network path is tested directly; if a TUN/VPN is active on Linux, the delay numbers and reachability are contaminated—turn it off first.
+Do not enable TUN while testing. The old Linux wrapper/cron workflow was removed; server results are not comparable.
 
 - `--exclude-insecure` drops `skip-cert-verify: true` nodes. Use it with `sync` to rebuild the pool, or with `build` to filter the existing results without re-testing (e.g. `build --exclude-insecure`). Many sources lose 30–98% of their nodes; in the 2026-10-18 pool this cut 319 usable nodes to 39.
 - `--ca-tls` keeps only CA-verified TLS nodes: explicit `tls: true` excluding Reality, plus TLS-inherent protocols (`trojan`, `hysteria`, `hysteria2`, `tuic`, `anytls`). It excludes plain HTTP/SOCKS5, non-TLS VMess, Mieru, and Reality. With the current results this cuts the strict 39 to 11. Use `build --exclude-insecure --ca-tls` to rebuild from results; keep a CA-TLS fallback node in the subscription so the provider can bootstrap.
@@ -136,6 +113,7 @@ Use absolute paths in cron, create the log directory first (`mkdir -p /home/USER
 - Published a secret Gist (its ID is stored only in local `publish.json`, not in this repository): `nodes.yaml` (11 CA-TLS proxies) + `clash.yaml` (subscription with provider). The original AnyTLS/VMess nodes were removed; `PROXY` uses one CA-TLS bootstrap node, then `AUTO`/`DIRECT`, plus the provider nodes. The 39- and 319-node versions remain in Gist history.
 - `publish` now refuses insecure nodes and, when `publish.json.ca_tls` is true, refuses non-CA-TLS/Reality/plain nodes unless the corresponding override flag is passed.
 - The old 10-node TUN smoke test was discarded; all current numbers are from the TUN-off run.
+- 2026-10-18 server test: all 11 CA-TLS nodes were unreachable because the server's network path differs. Those results are discarded; this skill is now scoped to the Windows PC. No scheduler/cron was created.
 
 ## Finding new sources (first step)
 
@@ -221,6 +199,6 @@ A subscription config that uses `proxy-providers` with a GitHub raw URL plus DNS
 - Recent revision history is not a guarantee of future cadence; use `state.json`/report.
 - Raw Gist CDN can lag. Sync compares `updated_at` and adds a cache-buster when a Gist changed.
 - Some nodes use `skip-cert-verify: true`; filtering them is a security/quantity tradeoff. In the tested pool 319 were usable and 280 of those were insecure; the strict 39 then reduced to 11 CA-TLS. Flipping `skip-cert-verify` to `false` requires re-testing; many will fail the TLS handshake.
-- TUN-on tests are contaminated and marked as such; do not use those delays for final selection. The automatic TUN check is Windows-only; on a Linux server make sure no TUN/VPN routes the test core.
+- TUN-on tests are contaminated and marked as such; do not use those delays for final selection. The automatic TUN check targets this Windows PC; keep it Windows-scoped unless the Linux path is revalidated. No scheduler is configured.
 - `pipeline` tests only the filtered set (11 CA-TLS in the current configuration), not the entire merged 1327. That is intentional for the subscription, but it does not measure the full pool.
 - The published `clash.yaml` is not regenerated by `pipeline`; it keeps the CA-TLS bootstrap proxy from setup time. If that bootstrap dies and the provider cache is empty, update the bootstrap block in the Gist or use a local provider file. `pipeline` only updates `nodes.yaml`.
