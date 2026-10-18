@@ -109,7 +109,7 @@ node $skill site-test --out .\gist-pool
 node $skill site-test --out .\gist-pool --targets github,google,chatgpt
 ```
 
-Targets live in the editable `targets.json` (github, google, chatgpt, grok, claude, youtube by default). Add or remove entries there; each entry is `{ "name": "short-name", "url": "https://..." }`. Use `--targets name1,name2` to run a subset, or `--targets-file /path/to/custom.json` to use an alternate list. The command writes `site-results.json` and `site-report.md` with a per-node × per-target delay matrix. It requires TUN off for clean numbers.
+Targets live in the **local, gitignored** `targets.json`. Copy the tracked `targets.example.json` to `targets.json` first. Each entry is `{ "name": "short-name", "url": "https://..." }`; add any sites you want. `targets.json` may contain sensitive sites and must never be committed. If it is absent, the script falls back to the public example; use `--targets name1,name2` to run a subset, or `--targets-file /path/to/custom.json` for an alternate list. The command writes `site-results.json` and `site-report.md` with a per-node × per-target delay matrix. It requires TUN off for clean numbers.
 
 Adding a target here only changes `site-test`. The subscription config's site groups and routing rules are separate; adding a new site group still requires updating the config and rules. The current groups use static ordered fallback lists derived from the matrix.
 

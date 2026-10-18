@@ -1,5 +1,9 @@
 .env
 **/.env
+
+# clash-gist-pool: local site targets may contain sensitive sites
+clash-gist-pool/targets.json
+
 __pycache__/
 **/__pycache__/
 *.pyc

@@ -907,10 +907,16 @@ async function runTests(out, o, pool) {
 }
 
 function loadTargets(o) {
-  const file = path.resolve(o['targets-file'] || process.env.TARGETS_FILE || path.join(SKILL_ROOT, 'targets.json'));
+  const explicitFile = o['targets-file'] || process.env.TARGETS_FILE;
+  const localFile = path.join(SKILL_ROOT, 'targets.json');
+  const exampleFile = path.join(SKILL_ROOT, 'targets.example.json');
+  const file = path.resolve(explicitFile || localFile);
   let raw = readJson(file, null);
+  if (!raw && !explicitFile && fs.existsSync(exampleFile)) {
+    raw = readJson(exampleFile, null);
+  }
   if (!raw) {
-    if (o['targets-file']) throw new Error(`targets file not found: ${file}`);
+    if (explicitFile) throw new Error(`targets file not found: ${file}`);
     raw = readJson(SOURCES_PATH, {}).targets || [];
   }
   const list = Array.isArray(raw) ? raw : raw.targets;
