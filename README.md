@@ -6,7 +6,6 @@ A collection of reusable skills for AI coding agents.
 
 | Skill | What it does |
 |---|---|
-| `clash-gist-pool` | Maintain a free Clash/Mihomo pool from Gists and GitLab wiki URI pages: discover/sync sources, dedupe and filter (strict/CA-TLS), test with the local Mihomo core using an editable per-site target list, and publish `nodes.yaml` for manual use on the Windows PC. |
 | `data-visualization-studio` | Build interactive or static charts, dashboards and statistical plots from datasets (PNG / SVG / HTML / PDF). |
 | `find-skills` | Entry point for skill discovery and installation. Prefers skillhub, falls back to clawhub. |
 | `general-pptx` | Hand-write or rework `.pptx`: PptxGenJS layouts from scratch, edit a supplied template in place, delete/duplicate slides, extract text and page structure. |
